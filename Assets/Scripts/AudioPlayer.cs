@@ -10,9 +10,8 @@ public class AudioPlayer : MonoBehaviour
         {
             if (_instance == null)
             {
-                _instance = FindObjectOfType<AudioPlayer> ();
+                _instance = FindObjectOfType<AudioPlayer>();
             }
-
             return _instance;
         }
     }
@@ -20,14 +19,14 @@ public class AudioPlayer : MonoBehaviour
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private List<AudioClip> _audioClips;
 
-    public void PlaySFX (string name)
+    public void PlaySFX(string name)
     {
-        AudioClip sfx = _audioClips.Find (s => s.name == name);
+        AudioClip sfx = _audioClips.Find(s => s.name == name);
         if (sfx == null)
         {
             return;
         }
 
-        _audioSource.PlayOneShot (sfx);
+        _audioSource.PlayOneShot(sfx);
     }
 }
