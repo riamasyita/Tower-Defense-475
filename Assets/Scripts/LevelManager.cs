@@ -6,6 +6,7 @@ using UnityEngine.UI;
 
 public class LevelManager : MonoBehaviour
 {
+    // fungsi singleton
     private static LevelManager _instance = null;
     public static LevelManager Instance
     {
@@ -15,9 +16,19 @@ public class LevelManager : MonoBehaviour
             {
                 _instance = FindObjectOfType<LevelManager>();
             }
+
             return _instance;
         }
     }
+
+    [SerializeField] private Transform _towerUIParent;
+    [SerializeField] private GameObject _towerUIPrefab;
+
+    [SerializeField] private Tower[] _towerPrefabs;
+    [SerializeField] private Enemy[] _enemyPrefabs;
+    [SerializeField] private Transform[] _enemyPaths;
+
+    [SerializeField] private float _spawnDelay = 5f;
 
     [SerializeField] private int _maxLives = 3;
     [SerializeField] private int _totalEnemy = 15;
@@ -27,17 +38,13 @@ public class LevelManager : MonoBehaviour
     [SerializeField] private Text _livesInfo;
     [SerializeField] private Text _totalEnemyInfo;
 
-    [SerializeField] private Transform _towerUIParent;
-    [SerializeField] private GameObject _towerUIPrefab;
+    // untuk spawned towers
+    private List<Tower> _spamnedTowers = new List<Tower>();
 
-    [SerializeField] private Tower[] _towerPrefabs;
-    [SerializeField] private Enemy[] _enemyPrefabs;
-
-    [SerializeField] private Transform[] _enemyPaths;
-    [SerializeField] private float _spawnDelay = 5f;
-
-    private List<Tower> _spawnedTowers = new List<Tower>();
+    // untuk spawned enemies
     private List<Enemy> _spawnedEnemies = new List<Enemy>();
+
+    // untuk Bullet
     private List<Bullet> _spawnedBullets = new List<Bullet>();
 
     private int _currentLives;
@@ -47,32 +54,29 @@ public class LevelManager : MonoBehaviour
     public bool IsOver { get; private set; }
 
     private void Start()
-    {
+    { 
         SetCurrentLives(_maxLives);
         SetTotalEnemy(_totalEnemy);
+    
+        // memanggil fungsi untuk menampilkan seluruh tower
+        // yang tersedia pada UI Tower Selection
         InstantiateAllTowerUI();
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        }
-
-        if (IsOver)
-        {
-            return;
-        }
-
+        // Counter untuk spawn enemy dalam jeda waktu yang ditentukan
+        // Time.unscaledDeltaTime adalah deltaTime yang independent, tidak terpengaruh oleh apapun kecuali game object itu sendiri,
+        // jadi bisa digunakan sebagai penghitung waktu
         _runningSpawnDelay -= Time.unscaledDeltaTime;
-        if (_runningSpawnDelay<=0f)
+
+        if (_runningSpawnDelay <= 0f)
         {
             SpawnEnemy();
             _runningSpawnDelay = _spawnDelay;
         }
 
-        foreach (Tower tower in _spawnedTowers)
+        foreach (Tower tower in _spamnedTowers)
         {
             tower.CheckNearestEnemy(_spawnedEnemies);
             tower.SeekTarget();
@@ -85,6 +89,9 @@ public class LevelManager : MonoBehaviour
             {
                 continue;
             }
+
+            // Kenapa nilainya 0.1? Karena untuk lebih mentoleransi perbedaan posisi,
+            // akan terlalu sulit jika perbedaan posisinya harus 0 atau sama persis
             if (Vector2.Distance(enemy.transform.position, enemy.TargetPosition) < 0.1f)
             {
                 enemy.SetCurrentPathIndex(enemy.CurrentPathIndex + 1);
@@ -94,40 +101,31 @@ public class LevelManager : MonoBehaviour
                 }
                 else
                 {
+                    ReduceLives(1);
                     enemy.gameObject.SetActive(false);
                 }
-
             }
             else
             {
+                // memanggil fungsi untuk bergerak ke target
                 enemy.MoveToTarget();
             }
+        }  
 
-        }
-
-
-    }
-
-    private void InstantiateAllTowerUI()
-    {
-        foreach (Tower tower in _towerPrefabs)
+        // Jika menekan tombol R, maka fungsi restart akan terpanggil
+        if (Input.GetKeyDown(KeyCode.Backspace))
         {
-            GameObject newTowerUIObj = Instantiate(_towerUIPrefab.gameObject, _towerUIParent);
-            TowerUI newTowerUI = newTowerUIObj.GetComponent<TowerUI>();
-
-            newTowerUI.SetTowerPrefab(tower);
-            newTowerUI.transform.name = tower.name;
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
+
+        if (IsOver) { return; }
     }
 
-    public void RegisterSpawnedTower(Tower tower)
-    {
-        _spawnedTowers.Add(tower);
-    }
-
+    // fungsi untuk spawn pada enemy secara random sesuai dengan prefabs nya
     private void SpawnEnemy()
     {
         SetTotalEnemy(--_enemyCounter);
+
         if (_enemyCounter < 0)
         {
             bool isAllEnemyDestroyed = _spawnedEnemies.Find(e => e.gameObject.activeSelf) == null;
@@ -145,13 +143,14 @@ public class LevelManager : MonoBehaviour
             e => !e.gameObject.activeSelf && e.name.Contains(enemyIndexString)
         )?.gameObject;
 
-
+        // jika objek pada enemy tidak ada
         if (newEnemyObj == null)
         {
             newEnemyObj = Instantiate(_enemyPrefabs[randomIndex].gameObject);
         }
 
         Enemy newEnemy = newEnemyObj.GetComponent<Enemy>();
+
         if (!_spawnedEnemies.Contains(newEnemy))
         {
             _spawnedEnemies.Add(newEnemy);
@@ -163,10 +162,43 @@ public class LevelManager : MonoBehaviour
         newEnemy.gameObject.SetActive(true);
     }
 
+    // Untuk menampilkan garis penghubung dalam window Scene
+    // tanpa harus di-Play terlebih dahulu
+    private void OnDrawGizmos()
+    {
+        for (int i = 0; i < _enemyPaths.Length - 1; i++)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(_enemyPaths[i].position, _enemyPaths[i + 1].position);
+        }
+    }
+
+    // menampilkan seluruh tower yang tersedia pada UI Tower Selection
+    private void InstantiateAllTowerUI()
+    {
+        foreach (Tower tower in _towerPrefabs)
+        {
+            GameObject newTowerUIObj = Instantiate(_towerUIPrefab.gameObject, _towerUIParent);
+            TowerUI newTowerUI = newTowerUIObj.GetComponent<TowerUI>();
+
+            newTowerUI.SetTowerPrefab(tower);
+            newTowerUI.transform.name = tower.name;
+        }
+    }
+
+    // mendaftarkan Tower yang di spawn agar bisa di kontrol oleh LevelManager
+    public void RegisterSpawnedTower(Tower tower)
+    {
+        _spamnedTowers.Add(tower);
+    }
+
+    // Getter bullet
     public Bullet GetBulletFromPool(Bullet prefab)
     {
         GameObject newBulletObj = _spawnedBullets.Find(
+
             b => !b.gameObject.activeSelf && b.name.Contains(prefab.name)
+
         )?.gameObject;
 
         if (newBulletObj == null)
@@ -199,6 +231,7 @@ public class LevelManager : MonoBehaviour
     public void ReduceLives(int value)
     {
         SetCurrentLives(_currentLives - value);
+
         if (_currentLives <= 0)
         {
             SetGameOver(false);
@@ -207,6 +240,8 @@ public class LevelManager : MonoBehaviour
 
     public void SetCurrentLives(int currentLives)
     {
+        // Mathf.Max fungsi nya adalah mengambil angka terbesar
+        // sehingga _currentLives di sini tidak akan lebih kecil dari 0
         _currentLives = Mathf.Max(currentLives, 0);
         _livesInfo.text = $"Lives: {_currentLives}";
     }
@@ -223,14 +258,7 @@ public class LevelManager : MonoBehaviour
 
         _statusInfo.text = isWin ? "You Win!" : "You Lose!";
         _panel.gameObject.SetActive(true);
+
     }
 
-    private void OnDrawGizmos()
-    {
-        for (int i = 0; i < _enemyPaths.Length - 1; i++)
-        {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawLine(_enemyPaths[i].position, _enemyPaths[i + 1].position);
-        }
-    }
 }

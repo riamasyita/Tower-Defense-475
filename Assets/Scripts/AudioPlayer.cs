@@ -1,9 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-public class AudioPlayer : MonoBehaviour
+public class AudioPlayer: MonoBehaviour
 {
     private static AudioPlayer _instance = null;
+
+    private AudioSource audioPlayer;
+
     public static AudioPlayer Instance
     {
         get
@@ -17,6 +21,7 @@ public class AudioPlayer : MonoBehaviour
     }
 
     [SerializeField] private AudioSource _audioSource;
+
     [SerializeField] private List<AudioClip> _audioClips;
 
     public void PlaySFX(string name)
@@ -26,7 +31,6 @@ public class AudioPlayer : MonoBehaviour
         {
             return;
         }
-
-        _audioSource.PlayOneShot(sfx);
+       _audioSource.PlayOneShot(sfx);
     }
 }
